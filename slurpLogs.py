@@ -9,8 +9,8 @@ import time
 
 # CONFIG
 fileHandler = logging.FileHandler('slurp.log')
-SLEEPTIME = 5 # seconds
-CLEARITERS = 6 # Amount of iters before clearing the sha set for space
+SLEEPTIME = 60 # seconds
+CLEARITERS = 50 # Amount of iters before clearing the sha set for space
 with open('AUTH', 'r') as f:
     TOKEN = f.read(40)
 assert(len(TOKEN) == 40)
