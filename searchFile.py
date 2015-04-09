@@ -9,8 +9,6 @@ def downloadURL(url):
     r = urllib2.urlopen(url)
     return r.read()
 
-
-
 def isSSLKey(text):
     privateKeyRE = re.compile(r'-----BEGIN (RSA )?PRIVATE KEY-----\n([0-9A-Za-z=+/\n]{100,})-----END (RSA )?PRIVATE KEY-----')
     return re.match(privateKeyRE, text) is not None
@@ -28,7 +26,6 @@ def extractAWSKeys(text):
         keys += [m[1] for m in re.findall(keyRE, text)]
     return keys
 
-
 def findSecrets(url, dbc):
     text = downloadURL(url)
 
@@ -37,12 +34,7 @@ def findSecrets(url, dbc):
     if keys:
         dbc.execute('INSERT INTO Secrets VALUES("");')
 
-
 def main():
-    #keyResults = [getKeysFromURL(url) for url in sys.stdin]
-    #for text, keys in keyResults:
-    #    print repr(keys)
-
     fileName = raw_input("file name: ")
     with open(fileName, 'r') as f:
         s = f.read()
@@ -50,7 +42,6 @@ def main():
             print "Match!"
         else:
             print "Not a match..."
-        
 
 if __name__=='__main__':
     main()
