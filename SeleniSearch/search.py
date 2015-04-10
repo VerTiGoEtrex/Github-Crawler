@@ -1,7 +1,10 @@
 from selenium import webdriver
 import random
+from time import gmtime, strftime
 import time
 import re
+
+KEYSDIR = '/Users/ncrocker/dev/Github-Crawler/SeleniSearch/keys/'
 
 SEARCHURL = 'https://github.com/search'
 SEARCHSTRING = 'AWSSecretKey'
@@ -81,6 +84,10 @@ def main():
             print '[-] Couldn\'t find next button'
             break
     print '[+] Done scanning GitHub results!'
+    with open(KEYSDIR + strftime("%Y-%m-%d_%H-%M-%S", gmtime()) + '_keys.txt', 'w') as outFile:
+        for x in keySet:
+            outFile.write(str(x))
+            outFile.write('\n')
     for x in keySet:
         print x
     driver.close()
