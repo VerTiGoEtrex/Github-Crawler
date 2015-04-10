@@ -67,11 +67,13 @@ def main():
                     secretKey = secretKeyMatch.group(0)
             if accessKey is not None and secretKey is not None:
                 print '[*] Found creds in {}: Access Key={}, Secret Key={}'.format(repoTitle, accessKey, secretKey)
-                keySet.add((accessKey, secretKey))
+                keySet.add((repoTitle, accessKey, secretKey))
             elif accessKey is not None:
                 print '[*] Found only one cred in {}: Access Key={}'.format(repoTitle, accessKey)
+                keySet.add((repoTitle, accessKey, None))
             elif secretKey is not None:
                 print '[*] Found only one cred in {}: Secret Key={}'.format(repoTitle, secretKey)
+                keySet.add((repoTitle, None, secretKey))
         try:
             nextButton = results.find_element_by_xpath('.//a[@class="next_page"]')
             nextButton.click()
