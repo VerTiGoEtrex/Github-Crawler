@@ -17,7 +17,7 @@ assert(len(TOKEN) == 40)
 DEBUGLOGGING = False
 # /CONFIG
 
-def handleCommitFile(fileObj=None):
+def handleCommitFile(repo=None, fileObj=None):
     #TODO Fill this in, Daniel
     print 'Daniel\'s function to parse file objects'
 
@@ -72,7 +72,7 @@ class EventCommitGetter():
             repo = github3.repos.repo.Repository(repoObj, session=self.gh)
             c = repo.commit(commitSha)
             # Get the commit, and send the files off to Daniel
-            newCommits.append(c)
+            newCommits.append((event.repo, c))
         self.numReturned += len(newCommits)
         return newCommits
 
@@ -88,13 +88,13 @@ class CommitFileGetter():
 
     def getNewFiles(self, commit):
         newFiles = list()
-        for f in commit.files:
+        for f in commit[1].files:
             fileSha = f['sha']
             if fileSha in self.shaSet:
                 self.numSkipped += 1
                 continue
             self.shaSet.add(fileSha)
-            newFiles.append(f)
+            newFiles.append((commit[0], f))
         self.numReturned += len(newFiles)
         return newFiles
 
@@ -136,7 +136,7 @@ def main():
                 allFiles.extend(files)
             print '[+] Sending file objects to secret finder'.format()
             for f in allFiles:
-                handleCommitFile(f)
+                handleCommitFile(repo=f[0], fileObj=f[1])
             endRateLimit = getRateLimit(gh)
             print '[+] NEW: {} events, {} commits, {} files'.format(len(pullEvents), len(allCommits), len(allFiles))
             print '[+] Sleeping for {} seconds with {} requests remaining -- used {} requests'.format(SLEEPTIME, endRateLimit, max(0, initialRateLimit - endRateLimit))
