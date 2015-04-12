@@ -7,6 +7,10 @@ import re
 import logging
 import inspect
 import time
+import searchFile
+import sqlite3
+import sys
+
 
 # CONFIG
 fileHandler = logging.FileHandler('slurp.log')
@@ -17,9 +21,12 @@ assert(len(TOKEN) == 40)
 DEBUGLOGGING = False
 # /CONFIG
 
-def handleCommitFile(repo=None, fileObj=None):
-    #TODO Fill this in, Daniel
-    print 'Daniel\'s function to parse file objects'
+def handleCommitFile(repo=None, fileObj=None, dbConn=None, dbCur=None):
+    # Why this if statement? Why not this if statement?
+    if repo and fileObj and dbConn and dbCur:
+        # Search for secrets
+        searchFile.findSecrets(fileObj['raw_url'], repo[0], repo[1], dbConn, dbCur)
+
 
 def getRateLimit(gh):
     return gh.rate_limit()['resources']['core']['remaining']
@@ -102,6 +109,10 @@ class CommitFileGetter():
         print '[*] CommitFileGetter -- numFiles: {}, numSkipped: {}, len(shaSet): {}'.format(self.numReturned, self.numSkipped, len(self.shaSet))
 
 def main():
+    #DB Stuff
+    dbConn = sqlite3.connect('secrets.db')
+    dbCur = dbConn.cursor()
+
     streamHandler = logging.StreamHandler()
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     fileHandler.setFormatter(formatter)
@@ -135,8 +146,18 @@ def main():
                 files = fileGetter.getNewFiles(commit)
                 allFiles.extend(files)
             print '[+] Sending file objects to secret finder'.format()
+            
+            # See if any of our stuff made it in
             for f in allFiles:
-                handleCommitFile(repo=f[0], fileObj=f[1])
+                if f[0][0] == 'fppro':
+                    print '[+] fppro commit is in this batch!'
+                    print '[+]', f[1]['raw_url']
+
+            for x in xrange(0, len(allFiles)):
+                f = allFiles[x]
+                sys.stdout.write("Checking file " + str(x + 1) + " of " + str(len(allFiles)) + "\r")
+                sys.stdout.flush()
+                handleCommitFile(repo=f[0], fileObj=f[1], dbConn=dbConn, dbCur=dbCur)
             endRateLimit = getRateLimit(gh)
             print '[+] NEW: {} events, {} commits, {} files'.format(len(pullEvents), len(allCommits), len(allFiles))
             print '[+] Sleeping for {} seconds with {} requests remaining -- used {} requests'.format(SLEEPTIME, endRateLimit, max(0, initialRateLimit - endRateLimit))
@@ -148,6 +169,8 @@ def main():
             time.sleep(SLEEPTIME)
         except KeyboardInterrupt:
             print '[*] EXITING'
+            dbConn.commit()
+            dbConn.close()
             eventGetter.printStats()
             commitGetter.printStats()
             fileGetter.printStats()
