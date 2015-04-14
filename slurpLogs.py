@@ -10,6 +10,11 @@ import time
 import searchFile
 import sqlite3
 import sys
+import grequests
+
+# openSSL shim
+#import urllib
+#urllib3.contrib.pyopenssl.inject_into_urllib3()
 
 
 # CONFIG
@@ -19,14 +24,14 @@ with open('AUTH', 'r') as f:
     TOKEN = f.read(40)
 assert(len(TOKEN) == 40)
 DEBUGLOGGING = False
+CHUNKSIZE = 50
 # /CONFIG
 
-def handleCommitFile(repo=None, fileObj=None, dbConn=None, dbCur=None):
+def handleCommitFile(repo=None, raw=None, dbConn=None, dbCur=None):
     # Why this if statement? Why not this if statement?
-    if repo and fileObj and dbConn and dbCur:
+    if repo and raw and dbConn and dbCur:
         # Search for secrets
-        searchFile.findSecrets(fileObj['raw_url'], repo[0], repo[1], dbConn, dbCur)
-
+        searchFile.findSecrets(raw, repo[0], repo[1], dbConn, dbCur)
 
 def getRateLimit(gh):
     return gh.rate_limit()['resources']['core']['remaining']
@@ -108,6 +113,14 @@ class CommitFileGetter():
     def printStats(self):
         print '[*] CommitFileGetter -- numFiles: {}, numSkipped: {}, len(shaSet): {}'.format(self.numReturned, self.numSkipped, len(self.shaSet))
 
+def chunks(l, n):
+    n = max(1, n)
+    return [l[i:i + n] for i in range(0, len(l), n)]
+
+def downloadException(request, ex):
+    print '[X] Exception while downloading {}'.format(request)
+    print ex
+
 def main():
     #DB Stuff
     dbConn = sqlite3.connect('secrets.db')
@@ -146,18 +159,32 @@ def main():
                 files = fileGetter.getNewFiles(commit)
                 allFiles.extend(files)
             print '[+] Sending file objects to secret finder'.format()
-            
+
             # See if any of our stuff made it in
             for f in allFiles:
                 if f[0][0] == 'fppro':
                     print '[+] fppro commit is in this batch!'
                     print '[+]', f[1]['raw_url']
 
-            for x in xrange(0, len(allFiles)):
-                f = allFiles[x]
-                sys.stdout.write("Checking file " + str(x + 1) + " of " + str(len(allFiles)) + "\r")
-                sys.stdout.flush()
-                handleCommitFile(repo=f[0], fileObj=f[1], dbConn=dbConn, dbCur=dbCur)
+            numFiles = len(allFiles)
+            allFiles = chunks(allFiles, CHUNKSIZE)
+
+            for i in xrange(0, len(allFiles)):
+                chunk = allFiles[i]
+                try:
+                    fileRequests = (grequests.get(u[1]['raw_url']) for u in chunk)
+                    reqResult = grequests.map(fileRequests)
+                    for j in xrange(0, len(reqResult)):
+                        f = chunk[j]
+                        raw = reqResult[j]
+                        sys.stdout.write("Checking file " + str(i*CHUNKSIZE + j + 1) + " of " + str(numFiles) + "\r")
+                        sys.stdout.flush()
+                        handleCommitFile(repo=f[0], raw=raw.text, dbConn=dbConn, dbCur=dbCur)
+                        raw.close()
+                except Exception, e:
+                    print '[X] Got an exception (while downloading file)! Waiting {} seconds in case of waitlimit'.format(SLEEPTIME)
+                    print e
+                    time.sleep(SLEEPTIME)
             endRateLimit = getRateLimit(gh)
             print '[+] NEW: {} events, {} commits, {} files'.format(len(pullEvents), len(allCommits), len(allFiles))
             print '[+] Sleeping for {} seconds with {} requests remaining -- used {} requests'.format(SLEEPTIME, endRateLimit, max(0, initialRateLimit - endRateLimit))
