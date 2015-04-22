@@ -11,30 +11,33 @@ def isSSLKey(text):
 def isBitcoin(url):
     return url.find("wallet.dat") >= 0
 
+accessID_RE = re.compile(r'(AKIA[0-9A-Z]{16})[^0-9A-Z]')
+key_RE = re.compile(r'([^0-9A-Za-z=+/]|^)([0-9A-Za-z=+/]{40})([^0-9A-Za-z=+/]|$)')
+
 def extractAWSKey(text):
-    keys = []
-
-    accessID_RE = re.compile(r'AKI[0-9A-Z]{17}')
-    key_RE = re.compile(r'([^0-9A-Za-z=+/]|^)([0-9A-Za-z=+/]{40})([^0-9A-Za-z=+/]|$)')
-
     access = re.search(accessID_RE, text)
     key = re.search(key_RE, text)
 
     if access and key:
-        return (access.group(0), key.group(2))
+        return (access.group(1), key.group(2))
     else:
         return (None, None)
+    
+ssh_RE = re.compile(r"sshpass\s+-p\s+\S+\s+ssh.*")
+rdesktop_RE = re.compile(r"rdesktop.*-p\s+\S+.*")
+def extractHardcodedPasswords(text):
+    print re.findall(ssh_RE, text)
+    sshPasswords = re.findall(ssh_RE, text)
+    rdesktopPasswords = re.findall(rdesktop_RE, text)
+    
+    return sshPasswords + rdesktopPasswords
 
+    
 def findSecrets(text, user, repo, dbConn, dbCur):
     try:
 
         # Check for various kinds of secrets (by which I mean one kind of secret)
         # and save to SQLite3
-
-        if "credentials2.txt" in url:
-            print "[!] Got the key file with the following contents:"
-            print text
-            print
 
         accessID, key = extractAWSKey(text)
 
@@ -42,6 +45,11 @@ def findSecrets(text, user, repo, dbConn, dbCur):
             dbCur.execute('INSERT INTO AWSKeys VALUES("' + accessID + '", "' + key + '", "' + user + '", "' + repo + '");')
             dbConn.commit()
             sys.stderr.write("Found an AWS key!\n")
+            
+        passwords = extractHardcodedPasswords(text)
+        for p in passwords:
+            sys.stderr.write(p + "\n")
+        
     except:
         pass
 
