@@ -2,7 +2,12 @@
 
 import sys
 import re
+import urllib2
 import sqlite3
+
+def downloadURL(url):
+    r = urllib2.urlopen(url)
+    return r.read()
 
 def isSSLKey(text):
     privateKeyRE = re.compile(r'-----BEGIN (RSA )?PRIVATE KEY-----\n([0-9A-Za-z=+/\n]{100,})-----END (RSA )?PRIVATE KEY-----')
@@ -31,12 +36,14 @@ def extractHardcodedPasswords(text):
     
     return sshPasswords + rdesktopPasswords
 
-    
-def findSecrets(text, user, repo, dbConn, dbCur):
+
+def findSecrets(url, user, repo, dbConn, dbCur):
     try:
+        text = downloadURL(url)
 
         # Check for various kinds of secrets (by which I mean one kind of secret)
         # and save to SQLite3
+
 
         accessID, key = extractAWSKey(text)
 
@@ -62,6 +69,15 @@ def main():
     dbCur = dbConn.cursor()
 
     findSecrets(text, "fppro", "Testing", dbConn, dbCur)
+
+
+    #fileName = raw_input("file name: ")
+    #with open(fileName, 'r') as f:
+    #    s = f.read()
+    #    if re.match(privateKeyRE, s):
+    #        print "Match!"
+    #    else:
+    #        print "Not a match..."
 
 if __name__=='__main__':
     main()
