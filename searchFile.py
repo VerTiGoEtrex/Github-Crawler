@@ -23,10 +23,9 @@ def extractAWSKey(text):
     else:
         return (None, None)
     
-ssh_RE = re.compile(r"sshpass\s+-p\s+\S+\s+ssh.*")
+ssh_RE = re.compile(r"sshpass\s+-p.*ssh.*")
 rdesktop_RE = re.compile(r"rdesktop.*-p\s+\S+.*")
 def extractHardcodedPasswords(text):
-    print re.findall(ssh_RE, text)
     sshPasswords = re.findall(ssh_RE, text)
     rdesktopPasswords = re.findall(rdesktop_RE, text)
     
@@ -42,23 +41,27 @@ def findSecrets(text, user, repo, dbConn, dbCur):
         accessID, key = extractAWSKey(text)
 
         if accessID and key:
-            dbCur.execute('INSERT INTO AWSKeys VALUES("' + accessID + '", "' + key + '", "' + user + '", "' + repo + '");')
+            dbCur.execute('INSERT INTO AWSKeys (AccessID, SecretKey, user, repo) VALUES("' + accessID + '", "' + key + '", "' + user + '", "' + repo + '");')
             dbConn.commit()
             sys.stderr.write("Found an AWS key!\n")
             
         passwords = extractHardcodedPasswords(text)
         for p in passwords:
-            sys.stderr.write(p + "\n")
+            dbCur.execute('INSERT INTO Passwords (SecretString, user, repo) VALUES("' + p + '", "' + user + '", "' + repo + '");')
+            dbConn.commit()
+            sys.stderr.write("Found a password!\n")
         
     except:
         pass
 
 def main():
-    url = raw_input("url: ")
+    f = open(raw_input("file: "), 'r')
+    text = f.read()
+    f.close()
     dbConn = sqlite3.connect("secrets.db")
     dbCur = dbConn.cursor()
 
-    findSecrets(url, "fppro", "Testing", dbConn, dbCur)
+    findSecrets(text, "fppro", "Testing", dbConn, dbCur)
 
 if __name__=='__main__':
     main()
